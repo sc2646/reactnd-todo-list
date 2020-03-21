@@ -6,6 +6,7 @@
 	<script src="https://unpkg.com/react@16.3.0-alpha.1/umd/react.development.js"></script>
 	<script src="https://unpkg.com/react-dom@16.3.0-alpha.1/umd/react-dom.development.js"></script>
 	<script src="https://unpkg.com/babel-standalone@6.15.0/babel.min.js"></script>
+	<script src="https://tylermcginnis.com/goals-todos-api/index.js"></script>
 </head>
 <body>
   <div>
@@ -67,6 +68,7 @@
     const TOGGLE_TODO = 'TOGGLE_TODO'
     const ADD_GOAL = 'ADD_GOAL'
     const REMOVE_GOAL = 'REMOVE_GOAL'
+		const RECEIVE_DATA = 'RECEIVE_DATA'
 
     function addTodoAction (todo) {
       return {
@@ -103,6 +105,14 @@
       }
     }
 
+		function receiveDataAction (todos, goals) {
+			return {
+				type: RECEIVE_DATA,
+				todos,
+				goals,
+			}
+		}
+
     function todos (state = [], action) {
       switch(action.type) {
         case ADD_TODO :
@@ -112,7 +122,9 @@
         case TOGGLE_TODO :
           return state.map((todo) => todo.id !== action.id ? todo :
             Object.assign({}, todo, { complete: !todo.complete }))
-        default :
+				case RECEIVE_DATA :
+						return action.todos
+				default :
           return state
       }
     }
@@ -123,7 +135,9 @@
           return state.concat([action.goal])
         case REMOVE_GOAL :
           return state.filter((goal) => goal.id !== action.id)
-        default :
+				case RECEIVE_DATA :
+						return action.goals
+				default :
           return state
       }
     }
@@ -139,6 +153,15 @@
 			}
 
 			return store.dispatch(action)
+		}
+
+		function loading (state = true, action) {
+			switch(action.type) {
+				case RECEIVE_DATA:
+					return false
+				default:
+					return state
+			}
 		}
 
 		// create redux middleware
@@ -185,6 +208,7 @@
     const store = Redux.createStore(Redux.combineReducers({
 			todos,
 			goals,
+			loading,
 		}), Redux.applyMiddleware(checker, logger)) // pass the invocation of middleware
 
     store.subscribe(() => {
@@ -327,22 +351,36 @@
 		class Todos extends React.Component {
 			addItem = (e) => {
 				e.preventDefault()
-				const name = this.input.value
-				this.input.value = ''
 
-				this.props.store.dispatch(addTodoAction({
-					name,
-					complete: false,
-					id: generateId()
-				}))
-			}
+				return API.saveTodo(this.input.value)
+					.then((todo) => {
+						this.props.store.dispatch(addTodoAction(todo))
+						this.input.value = ''
+					})
+					.catch(() => {
+						alert('There was an error. Try again.')
+					})
+				}
+
 
 			removeItem = (todo) => {
 				this.props.store.dispatch(removeTodoAction(todo.id))
+
+				return API.deleteTodo(todo.id)
+					.catch(() => {
+						this.props.store.dispatch(addTodoAction(todo))
+						alert('An error occurred. Try again.')
+					})
 			}
 
 			toggleItem = (id) => {
 				this.props.store.dispatch(toggleTodoAction(id))
+
+				return API.saveTodoToggle(id)
+					.catch(() => {
+						this.props.store.dispatch(toggleTodoAction(id))
+						alert('An error occurred. Try again. ')
+					})
 			}
 
 			render() {
@@ -368,17 +406,23 @@
 		class Goals extends React.Component {
 			addItem = (e) => {
 				e.preventDefault()
-				const name = this.input.value
-				this.input.value = ''
 
-				this.props.store.dispatch(addGoalAction({
-					name,
-					id: generateId()
-				}))
+				return API.saveGoal(this.input.value)
+					.then((goal) => {
+						this.props.store.dispatch(addGoalAction(goal))
+						this.input.value = ''
+					})
+					.catch(() => alert('There was an error. Try again.'))
 			}
 
 			removeItem = (goal) => {
 				this.props.store.dispatch(removeGoalAction(goal.id))
+
+				return API.deleteGoal(goal.id)
+					.catch(() => {
+						this.props.store.dispatch(addGoalAction(goal))
+						alert('An error occurred. Try again.')
+					})
 			}
 
 			render() {
@@ -404,12 +448,22 @@
 			componentDidMount () {
 				const { store } = this.props
 
+				Promise.all([
+					API.fetchTodos(),
+					API.fetchGoals()
+				]).then(([ todos, goals ]) => {
+					store.dispatch(receiveDataAction(todos, goals))
+				})
 				// force update the specific component, and re-render
 				store.subscribe(() => this.forceUpdate())
 			}
 			render() {
 				const { store } = this.props
-				const { todos, goals } = store.getState()
+				const { todos, goals, loading } = store.getState()
+
+				if (loading === true) {
+					return <h3>Loading</h3>
+				}
 				return (
 					<div>
 						<Todos todos={todos} store={this.props.store}/>
