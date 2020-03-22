@@ -463,7 +463,7 @@
 			}
 		}
 
-		const ConnectedTodos = connect((state) => ({
+		const ConnectedTodos = ReactRedux.connect((state) => ({
 	      todos: state.todos
 	    }))(Todos)
 
@@ -499,7 +499,7 @@
 			}
 		}
 
-		const ConnectedGoals = connect((state) => ({
+		const ConnectedGoals = ReactRedux.connect((state) => ({
       goals: state.goals
     }))(Goals)
 
@@ -525,14 +525,14 @@
 			}
 		}
 
-		const ConnectedApp = connect((state) => ({
+		const ConnectedApp = ReactRedux.connect((state) => ({
       loading: state.loading
     }))(App)
 
 		ReactDOM.render(
-			<Provider store={store}>
+			<ReactRedux.Provider store={store}>
 				<ConnectedApp />,
-			</Provider>,
+			</ReactRedux.Provider>,
       document.getElementById('app')
     )
 	</script>
